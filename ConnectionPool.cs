@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace xmla_func_proxy
+namespace Xmla.Func.Proxy
 {
     //From https://github.com/microsoft/azure-analysis-services-http-sample
     public class ConnectionPoolEntry
