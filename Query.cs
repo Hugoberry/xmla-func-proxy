@@ -21,15 +21,11 @@ namespace Xmla.Func.Proxy
             [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
             ILogger log)
         {
-            log.LogInformation("C# HTTP trigger function processed a request.");
-
+            log.LogInformation("Starting lambda");
             string query = await new StreamReader(req.Body).ReadToEndAsync();
-            //dynamic data = JsonConvert.DeserializeObject(requestBody);
-
-            string responseMessage = $"Processing the DAX query";
-
+            
+            log.LogInformation($"Running the following DAX >>> {query}");
             return await GetQueryResult(query, log);
-            //return new OkObjectResult(responseMessage);
         }
 
         private static async Task<IActionResult> GetQueryResult(string query, ILogger log)
@@ -46,9 +42,9 @@ namespace Xmla.Func.Proxy
                 cmd.CommandTimeout = 2 * 60;
 
                 object queryResults;
-                log.LogInformation("Star execution");
+                log.LogInformation("Start  DAX execution");
                 queryResults = cmd.Execute();
-                log.LogInformation("Finished execution");
+                log.LogInformation("Finish DAX execution");
 
 
                 if (queryResults is AdomdDataReader rdr)
