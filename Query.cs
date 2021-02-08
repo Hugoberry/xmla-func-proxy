@@ -13,7 +13,7 @@ namespace xmla_func_proxy
 {
     public static class Query
     {
-        private static ConnectionPool pool;
+        private static ConnectionPool pool = new ConnectionPool();
         private static readonly string constr = Environment.GetEnvironmentVariable("DatasetConnectionString");
 
         [FunctionName("Query")]
@@ -28,39 +28,46 @@ namespace xmla_func_proxy
 
             string responseMessage = $"Processing the DAX query";
 
-            return await GetQueryResult(query);
+            return await GetQueryResult(query, log);
             //return new OkObjectResult(responseMessage);
         }
 
-        private static async Task<IActionResult> GetQueryResult(string query)
+        private static async Task<IActionResult> GetQueryResult(string query, ILogger log)
         {
 
-
-
-            //ConnectionPoolEntry con;
-            //con = pool.GetConnection(constr);
-
-            var con = new AdomdConnection(constr);
-
-            con.Open();
-
-            var cmd = con.CreateCommand();
-
-            cmd.CommandText = query;
-            cmd.CommandTimeout = 2 * 60;
-            object queryResults;
-            queryResults = cmd.Execute();
-
-
-
-            if (queryResults is AdomdDataReader rdr)
+            ConnectionPoolEntry con;
+            try
             {
-                return new OkObjectResult(queryResults);
-                //return new QueryResult(rdr, con, pool);
-            }
+                con = pool.GetConnection(constr);
 
-            return new BadRequestResult();
-            //return bad result
+                //var con = new AdomdConnection(constr);
+
+                //con.Open();
+
+                var cmd = con.Connection.CreateCommand();
+
+                cmd.CommandText = query;
+                cmd.CommandTimeout = 2 * 60;
+                object queryResults;
+                queryResults = cmd.Execute();
+
+
+
+                if (queryResults is AdomdDataReader rdr)
+                {
+                    return new OkObjectResult(queryResults);
+                    //return new QueryResult(rdr, con, pool);
+                }
+
+                return new BadRequestResult();
+
+            }
+            catch (Exception ex)
+            {
+                var msg = ex.Message;
+                log.LogError(msg);
+                return new BadRequestObjectResult(msg);
+            }
         }
 
 

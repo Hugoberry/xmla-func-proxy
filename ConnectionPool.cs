@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 
 namespace xmla_func_proxy
 {
+    //From https://github.com/microsoft/azure-analysis-services-http-sample
     public class ConnectionPoolEntry
     {
 
@@ -70,7 +71,7 @@ namespace xmla_func_proxy
             return System.Text.Json.JsonSerializer.Serialize(this);
         }
     }
-
+    
     //This is a simple Connection Pool, made simple because the client 
     //is responsible for checking out and back in the ConnectionPoolEntry, not just the AdomdConneciton.
     //The ConnectionPoolEntry has a reference to the AdomdConnection and vice versa so they have the same lifetime.
