@@ -1,22 +1,34 @@
 using Microsoft.AnalysisServices.AdomdClient;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 
-namespace xmla_func_proxy
+namespace Xmla.Func.Proxy
 {
     class QueryResult : ActionResult
     {
         private AdomdDataReader queryResults;
         private ConnectionPoolEntry con;
         private ConnectionPool pool;
-        public QueryResult(AdomdDataReader queryResults, ConnectionPoolEntry con, ConnectionPool pool)
+        private CancellationToken cancel;
+        private ILogger log;
+        private bool gzip;
+        private bool bufferResults;
+
+        // private Logger log;
+        public QueryResult(AdomdDataReader queryResults, bool gzip, bool bufferResults, ConnectionPoolEntry con, ConnectionPool pool, ILogger log)
         {
             this.queryResults = queryResults;
+            this.log = log;
+            this.gzip = gzip;
+            this.bufferResults = bufferResults;
             this.con = con;
             this.pool = pool;
         }
@@ -26,28 +38,36 @@ namespace xmla_func_proxy
 
             context.HttpContext.Response.ContentType = "application/json";
             context.HttpContext.Response.StatusCode = (int)HttpStatusCode.OK;
-
+            if (gzip)
+            {
+                context.HttpContext.Response.Headers.Add("Content-Encoding", "gzip");
+            }
             var streaming = true;
 
             await context.HttpContext.Response.StartAsync();
 
             var responseStream = context.HttpContext.Response.Body;
             System.IO.Stream encodingStream = responseStream;
+            if (gzip)
+            {
+                encodingStream = new System.IO.Compression.GZipStream(responseStream, System.IO.Compression.CompressionMode.Compress, false);
+            }
 
             try
             {
                 if (streaming)
                 {
-                    await WriteResultsToStream(queryResults, encodingStream);
+                    await WriteResultsToStream(queryResults, encodingStream, context.HttpContext.RequestAborted, log);
                 }
                 else
                 {
                     var ms = new MemoryStream();
-                    await WriteResultsToStream(queryResults, ms);
+                    await WriteResultsToStream(queryResults, ms, context.HttpContext.RequestAborted, log);
                     ms.Position = 0;
                     var buf = new byte[256];
                     ms.Read(buf, 0, buf.Length);
                     var str = System.Text.Encoding.UTF8.GetString(buf);
+                    log.LogInformation($"buffered query results starting {str}");
                     ms.Position = 0;
 
 
@@ -62,25 +82,29 @@ namespace xmla_func_proxy
             }
             catch (Exception ex)
             {
+                log.LogError(ex, "Error writing results");
                 con.Connection.Dispose(); //do not return to pool
                 throw;  //too late to send error to client  
             }
 
         }
 
-        static async Task WriteResultsToStream(AdomdDataReader results, Stream stream)
+        //static System.Text.UTF8Encoding encoding = new System.Text.UTF8Encoding(false);
+        static System.Text.UTF8Encoding encoding = new System.Text.UTF8Encoding(false);
+
+        static async Task WriteResultsToStream(AdomdDataReader results, Stream stream, CancellationToken cancel, ILogger log)
         {
 
             if (results == null)
             {
-                //log.LogInformation("Null results");
+                log.LogInformation("Null results");
                 return;
             }
 
             using var rdr = results;
 
             //can't call Dispose on these without syncronous IO on the underlying connection
-            var tw = new StreamWriter(stream, null, 1024 * 4, true);
+            var tw = new StreamWriter(stream, encoding, 1024 * 4, true);
             var w = new Newtonsoft.Json.JsonTextWriter(tw);
             int rows = 0;
 

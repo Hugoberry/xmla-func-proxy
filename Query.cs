@@ -53,44 +53,7 @@ namespace Xmla.Func.Proxy
 
                 if (queryResults is AdomdDataReader rdr)
                 {
-                    //return new OkObjectResult(queryResults);
-                    //return new QueryResult(rdr, con, pool, log);
-                    var stream = new MemoryStream();
-                    var encoding = new System.Text.UTF8Encoding(false);
-                    using (var tw = new StreamWriter(stream, encoding, 1024 * 4, true))
-                    using (var w = new Newtonsoft.Json.JsonTextWriter(tw))
-                    {
-
-                        await w.WriteStartObjectAsync();
-                        var rn = "rows";
-
-                        await w.WritePropertyNameAsync(rn);
-                        await w.WriteStartArrayAsync();
-
-                        while (rdr.Read())
-                        {
-                            await w.WriteStartObjectAsync();
-                            for (int i = 0; i < rdr.FieldCount; i++)
-                            {
-                                string name = rdr.GetName(i);
-                                object value = rdr.GetValue(i);
-
-                                await w.WritePropertyNameAsync(name);
-                                await w.WriteValueAsync(value);
-                            }
-                            await w.WriteEndObjectAsync();
-                        }
-
-                        await w.WriteEndArrayAsync();
-                        await w.WriteEndObjectAsync();
-
-                        await w.FlushAsync();
-                        await tw.FlushAsync();
-                        await stream.FlushAsync();
-
-                        stream.Seek(0, SeekOrigin.Begin);
-                        return new FileStreamResult(stream, "application/json");
-                    }
+                    return new QueryResult(rdr,true,false,con,pool,log);
                 }
 
                 return new BadRequestResult();
